@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>전국 교량 현황 실시간 검색</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f8f9fa; color: #333; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+        
+        /* 검색창 디자인 */
+        .search-panel { display: flex; gap: 10px; flex-wrap: wrap; background: #e9ecef; padding: 20px; border-radius: 8px; justify-content: center; margin-bottom: 20px; }
+        select { padding: 10px; border: 1px solid #ced4da; border-radius: 5px; min-width: 170px; }
+        button { padding: 10px 25px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        
+        /* 테이블 디자인 */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background-color: #343a40; color: white; position: sticky; top: 0; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .status-msg { text-align: center; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌉 전국 교량 현황 검색 (실시간 API)</h1>
+
+    <div class="search-panel">
+        <select id="sidoSelect"><option value="">지역(시도) 선택</option></select>
+        <select id="roadSelect"><option value="">도로명 선택</option></select>
+        <select id="structSelect"><option value="">상부구조 선택</option></select>
+        <button onclick="filterResults()">검색</button>
+    </div>
+
+    <div id="status" class="status-msg">데이터를 불러오는 중입니다...</div>
+    <div id="count" style="margin-bottom: 5px; font-size: 0.9em; color: #666;"></div>
+
+    <table id="resultTable">
+        <thead>
+            <tr>
+                <th>시설물명</th>
+                <th>시도명</th>
+                <th>노선명</th>
+                <th>상부구조형식</th>
+            </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+    </table>
+</div>
+
+<script>
+    // 1. 설정: 인증키와 URL
+    const SERVICE_KEY = '사용자님의_인증키를_여기에_넣으세요'; 
+    const API_URL = `https://api.odcloud.kr/api/15081953/v1/uddi:b3633094-1a29-43c2-a877-6c84c7811202?page=1&perPage=2000&serviceKey=${SERVICE_KEY}`;
+
+    let bridgeData = [];
+
+    // 2. API 데이터 가져오기
+    async function fetchApiData() {
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error('API 호출 실패 (키 또는 권한 확인)');
+            
+            const result = await response.json();
+            bridgeData = result.data; // API 문서상 데이터는 'data' 필드에 담겨 있음
+
+            document.getElementById('status').style.display = 'none';
+            setupFilters();
+        } catch (error) {
+            document.getElementById('status').innerText = '오류: ' + error.message;
+            document.getElementById('status').style.color = 'red';
+        }
+    }
+
+    // 3. 선택형(드롭다운) 메뉴 구성
+    function setupFilters() {
+        const sidos = [...new Set(bridgeData.map(b => b['시도명']))].filter(Boolean).sort();
+        const roads = [...new Set(bridgeData.map(b => b['노선명']))].filter(Boolean).sort();
+        const structs = [...new Set(bridgeData.map(b => b['상부구조형식']))].filter(Boolean).sort();
+
+        fillOptions('sidoSelect', sidos);
+        fillOptions('roadSelect', roads);
+        fillOptions('structSelect', structs);
+    }
+
+    function fillOptions(id, items) {
+        const select = document.getElementById(id);
+        items.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item;
+            opt.textContent = item;
+            select.appendChild(opt);
+        });
+    }
+
+    // 4. 필터링 및 화면 출력
+    function filterResults() {
+        const sido = document.getElementById('sidoSelect').value;
+        const road = document.getElementById('roadSelect').value;
+        const struct = document.getElementById('structSelect').value;
+
+        const filtered = bridgeData.filter(b => {
+            return (!sido || b['시도명'] === sido) &&
+                   (!road || b['노선명'] === road) &&
+                   (!struct || b['상부구조형식'] === struct);
+        });
+
+        displayTable(filtered);
+    }
+
+    function displayTable(data) {
+        const tbody = document.getElementById('resultBody');
+        const countDisp = document.getElementById('count');
+        tbody.innerHTML = '';
+        countDisp.innerText = `검색 결과: ${data.length}건`;
+
+        data.forEach(b => {
+            const row = `<tr>
+                <td>${b['시설물명']}</td>
+                <td>${b['시도명']}</td>
+                <td>${b['노선명']}</td>
+                <td>${b['상부구조형식']}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">검색 조건에 맞는 교량이 없습니다.</td></tr>';
+        }
+    }
+
+    // 페이지 시작 시 호출
+    fetchApiData();
+</script>
+
+</body>
+</html>
