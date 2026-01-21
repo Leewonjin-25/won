@@ -1,45 +1,83 @@
-let allData = [];
-let filteredData = [];
-let map, markers = [], polyline;
+let allData = [];      // 전체 데이터
+let filteredData = []; // 검색 조건에 맞는 데이터
+let map;               // 카카오 맵 객체
+let currentIndex = 0;  // 현재 보여주는 목록 인덱스
+const PAGE_SIZE = 10;  // 한 번에 보여줄 개수
 
-// 1. 데이터 로드 및 초기 셀렉트 박스 세팅
+// 1. 데이터 로드 (CSV 파일명이 실제와 일치해야 합니다)
 Papa.parse("한국문화정보원_전국 배리어프리 문화예술관광지_20221125.csv", {
-    download: true, header: true,
+    download: true,
+    header: true,
     complete: function(results) {
-        allData = results.data.filter(d => d.위도 && d.경도);
-        initFilters();
+        // 위도, 경도가 있는 데이터만 유효 데이터로 취급
+        allData = results.data.filter(d => d.위도 && d.경도 && d.시설명);
+        console.log("데이터 로드 완료:", allData.length);
+        initFilters(); // 필터 초기화
+        initMap(37.5665, 126.9780); // 초기 지도 서울 중심으로 설정
+    },
+    error: function(err) {
+        console.error("CSV 로드 실패:", err);
+        alert("데이터 파일을 찾을 수 없습니다. 파일명을 확인해주세요.");
     }
 });
 
+// 2. 필터 초기화 (데이터 기반으로 셀렉트 박스 채우기)
 function initFilters() {
-    const sidos = [...new Set(allData.map(d => d['시도 명칭']))].sort();
+    const sidos = [...new Set(allData.map(d => d['시도 명칭']))].filter(Boolean).sort();
     fillSelect('sidoSelect', sidos);
-    const cat1 = [...new Set(allData.map(d => d['카테고리1']))].sort();
+    
+    const cat1 = [...new Set(allData.map(d => d['카테고리1']))].filter(Boolean).sort();
     fillSelect('cat1Select', cat1);
-    const cat2 = [...new Set(allData.map(d => d['카테고리2']))].sort();
+    
+    const cat2 = [...new Set(allData.map(d => d['카테고리2']))].filter(Boolean).sort();
     fillSelect('cat2Select', cat2);
 }
 
 function fillSelect(id, list) {
     const sel = document.getElementById(id);
-    list.forEach(item => { if(item) sel.innerHTML += `<option value="${item}">${item}</option>`; });
+    list.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item;
+        opt.textContent = item;
+        sel.appendChild(opt);
+    });
 }
 
+// 3. 시/군/구 업데이트 (시/도 선택 시 호출)
 function updateGugun() {
     const sido = document.getElementById('sidoSelect').value;
-    const guguns = [...new Set(allData.filter(d => d['시도 명칭'] === sido).map(d => d['시군구 명칭']))].sort();
-    const sel = document.getElementById('gugunSelect');
-    sel.innerHTML = '<option value="">시/군/구 선택</option>';
-    guguns.forEach(g => { if(g) sel.innerHTML += `<option value="${g}">${g}</option>`; });
+    const gugunSelect = document.getElementById('gugunSelect');
+    gugunSelect.innerHTML = '<option value="">시/군/구 선택</option>';
+    
+    if (!sido) return;
+
+    const guguns = [...new Set(allData.filter(d => d['시도 명칭'] === sido).map(d => d['시군구 명칭']))].filter(Boolean).sort();
+    guguns.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g;
+        opt.textContent = g;
+        gugunSelect.appendChild(opt);
+    });
 }
 
-// 2. 검색 기능
+// 4. 지도 초기화
+function initMap(lat, lng) {
+    const container = document.getElementById('map');
+    const options = {
+        center: new kakao.maps.LatLng(lat, lng),
+        level: 8
+    };
+    map = new kakao.maps.Map(container, options);
+}
+
+// 5. 검색 및 결과 출력
 function searchPlaces() {
     const sido = document.getElementById('sidoSelect').value;
     const gugun = document.getElementById('gugunSelect').value;
     const c1 = document.getElementById('cat1Select').value;
     const c2 = document.getElementById('cat2Select').value;
 
+    // 필터링 로직
     filteredData = allData.filter(d => 
         (!sido || d['시도 명칭'] === sido) &&
         (!gugun || d['시군구 명칭'] === gugun) &&
@@ -47,185 +85,63 @@ function searchPlaces() {
         (!c2 || d['카테고리2'] === c2)
     );
 
-    if(filteredData.length > 0) {
-        document.getElementById('course-ui').style.display = 'block';
-        initMap(filteredData[0].위도, filteredData[0].경도);
-        renderList(filteredData);
+    if (filteredData.length > 0) {
+        currentIndex = 0;
+        document.getElementById('info-list').innerHTML = ''; // 이전 결과 삭제
+        
+        // 검색 결과의 첫 번째 장소로 지도 이동 및 확대
+        const first = filteredData[0];
+        moveToLocation(first.위도, first.경도);
+        
+        renderNextPage(); // 목록 출력
     } else {
         alert("해당 조건의 장소가 없습니다.");
     }
 }
 
-// 3. 거리 계산 및 코스 생성 (20km)
-function getDist(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function makeCourse() {
-    clearMap();
-    const start = filteredData[Math.floor(Math.random() * filteredData.length)];
-    const course = [start];
-    
-    const candidates = filteredData.filter(d => {
-        const dkm = getDist(start.위도, start.경도, d.위도, d.경도);
-        return dkm > 0 && dkm <= 20;
-    });
-
-    // 20km 이내 장소 중 랜덤하게 2곳 더 추가
-    const shuffled = candidates.sort(() => 0.5 - Math.random());
-    course.push(...shuffled.slice(0, 2));
-
-    renderMapMarkers(course);
-    renderList(course, true);
-}
-
-// 4. 정보 출력 (모든 배리어프리 항목 포함)
-function renderList(data, isCourse = false) {
-    const list = document.getElementById('info-list');
-    list.innerHTML = isCourse ? "<h2>🚩 추천 답사 코스</h2>" : `<h2>📍 검색 결과 (${data.length}곳)</h2>`;
-    
-    data.forEach((d, idx) => {
-        list.innerHTML += `
-            <div class="place-card">
-                <h3>${isCourse ? (idx+1)+'. ' : ''}${d.시설명} <small>${d.카테고리2}</small></h3>
-                <p>📍 ${d.도로명주소}</p>
-                <div class="accessibility-icons">
-                    <span class="badge">⏰ 운영: ${d.운영시간}</span>
-                    <span class="badge">🅿️ 무료주차: ${d['무료주차 가능여부']}</span>
-                    <span class="badge">💰 입장료: ${d['입장료 유무 여부']}</span>
-                    <span class="badge">🚪 전용출입문: ${d['장애인용 출입문']}</span>
-                    <span class="badge">♿ 휠체어대여: ${d['휠체어 대여 가능 여부']}</span>
-                    <span class="badge">🚻 장애인화장실: ${d['장애인 화장실 유무']}</span>
-                    <span class="badge">🅿️ 전용주차장: ${d['장애인 전용 주차장 여부']}</span>
-                    <span class="badge">🚛 대형주차: ${d['대형주차장 가능여부']}</span>
-                    <span class="badge">🦮 안내견동반: ${d['시각장애인 안내견 동반 가능 여부']}</span>
-                    <span class="badge">📖 점자가이드: ${d['점자 가이드 여부']}</span>
-                </div>
-            </div>`;
-    });
-}
-// 지도를 해당 위치로 이동시키는 함수
-function moveToLocation(lat, lng) {
-    // 카카오맵 좌표 객체 생성
-    var moveLatLon = new kakao.maps.LatLng(lat, lng);
-    
-    // 지도를 부드럽게 해당 좌표로 이동시킵니다
-    // 만약 이동 거리가 멀면 바로 이동(setCenter)하게 할 수도 있습니다.
-    map.panTo(moveLatLon); 
-    
-    // 이동 후 선택한 지점에 인포윈도우를 띄우거나 레벨을 확대하고 싶다면 추가
-    map.setLevel(3); 
-}const sidoList = [
-  "서울특별시","부산광역시","대구광역시","인천광역시","광주광역시",
-  "대전광역시","울산광역시","세종특별자치시",
-  "경기도","강원특별자치도","충청북도","충청남도",
-  "전라북도","전라남도","경상북도","경상남도","제주특별자치도"
-];
-
-const gugunData = {
-  "서울특별시": ["종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구","강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구","구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구"],
-
-  "부산광역시": ["중구","서구","동구","영도구","부산진구","동래구","남구","북구","해운대구","사하구","금정구","강서구","연제구","수영구","사상구","기장군"],
-
-  "대구광역시": ["중구","동구","서구","남구","북구","수성구","달서구","달성군","군위군"],
-
-  "인천광역시": ["중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","강화군","옹진군"],
-
-  "광주광역시": ["동구","서구","남구","북구","광산구"],
-
-  "대전광역시": ["동구","중구","서구","유성구","대덕구"],
-
-  "울산광역시": ["중구","남구","동구","북구","울주군"],
-
-  "세종특별자치시": ["세종시"],
-
-  "경기도": ["수원시","성남시","의정부시","안양시","부천시","광명시","평택시","동두천시","안산시","고양시","과천시","구리시","남양주시","오산시","시흥시","군포시","의왕시","하남시","용인시","파주시","이천시","안성시","김포시","화성시","광주시","양주시","포천시","여주시","연천군","가평군","양평군"],
-
-  "강원특별자치도": ["춘천시","원주시","강릉시","동해시","태백시","속초시","삼척시","홍천군","횡성군","영월군","평창군","정선군","철원군","화천군","양구군","인제군","고성군","양양군"],
-
-  "충청북도": ["청주시","충주시","제천시","보은군","옥천군","영동군","증평군","진천군","괴산군","음성군","단양군"],
-
-  "충청남도": ["천안시","공주시","보령시","아산시","서산시","논산시","계룡시","당진시","금산군","부여군","서천군","청양군","홍성군","예산군","태안군"],
-
-  "전라북도": ["전주시","군산시","익산시","정읍시","남원시","김제시","완주군","진안군","무주군","장수군","임실군","순창군","고창군","부안군"],
-
-  "전라남도": ["목포시","여수시","순천시","나주시","광양시","담양군","곡성군","구례군","고흥군","보성군","화순군","장흥군","강진군","해남군","영암군","무안군","함평군","영광군","장성군","완도군","진도군","신안군"],
-
-  "경상북도": ["포항시","경주시","김천시","안동시","구미시","영주시","영천시","상주시","문경시","경산시","의성군","청송군","영양군","영덕군","청도군","고령군","성주군","칠곡군","예천군","봉화군","울진군","울릉군"],
-
-  "경상남도": ["창원시","진주시","통영시","사천시","김해시","밀양시","거제시","양산시","의령군","함안군","창녕군","고성군","남해군","하동군","산청군","함양군","거창군","합천군"],
-
-  "제주특별자치도": ["제주시","서귀포시"]
-};
-
-// 시/도 채우기
-const sidoSelect = document.getElementById("sidoSelect");
-sidoList.forEach(sido => {
-  const opt = document.createElement("option");
-  opt.value = sido;
-  opt.textContent = sido;
-  sidoSelect.appendChild(opt);
-});
-
-// 시/군/구 갱신
-function updateGugun() {
-  const sido = document.getElementById("sidoSelect").value;
-  const gugunSelect = document.getElementById("gugunSelect");
-  gugunSelect.innerHTML = `<option value="">시/군/구 선택</option>`;
-  if (!gugunData[sido]) return;
-
-  gugunData[sido].forEach(gugun => {
-    const opt = document.createElement("option");
-    opt.value = gugun;
-    opt.textContent = gugun;
-    gugunSelect.appendChild(opt);
-  });
-}
-
-
-function initMap(lat, lng) {
-    const container = document.getElementById('map');
-    map = new kakao.maps.Map(container, { center: new kakao.maps.LatLng(lat, lng), level: 5 });
-}
-
-function renderMapMarkers(course) {
-    const path = [];
-    course.forEach(d => {
-        const pos = new kakao.maps.LatLng(d.위도, d.경도);
-        path.push(pos);
-        new kakao.maps.Marker({ position: pos, map: map });
-    });
-    polyline = new kakao.maps.Polyline({ path: path, strokeColor: '#e67e22', strokeOpacity: 0.8, strokeWeight: 5, map: map });
-}
-
-function clearMap() { if(polyline) polyline.setMap(null); markers.forEach(m => m.setMap(null)); }
-// 검색 결과를 목록에 표시하는 함수
-function displayPlaces(places) {
+// 6. 목록 렌더링 (10개씩 더보기 포함)
+function renderNextPage() {
     const listDiv = document.getElementById('info-list');
-    listDiv.innerHTML = ''; // 이전 결과 초기화
+    const nextData = filteredData.slice(currentIndex, currentIndex + PAGE_SIZE);
 
-    if (places.length === 0) {
-        listDiv.innerHTML = '<p class="no-result">조회된 결과가 없습니다.</p>';
-        return;
-    }
-
-    places.forEach((place) => {
-        // 1. 목록 아이템 생성
+    nextData.forEach(d => {
         const item = document.createElement('div');
         item.className = 'place-item';
-        item.style.cursor = 'pointer'; // 클릭 가능함을 표시
-        item.innerText = place.title; // CSV/API 데이터의 '이름' 필드
-
-        // 2. 클릭 이벤트 추가
-        item.onclick = function() {
-            moveToLocation(place.lat, place.lng); // 위도, 경도 전달
-        };
-
+        // HTML 구조에 맞춰 시설명 출력 및 클릭 이벤트 부여
+        item.innerHTML = `<strong>${d.시설명}</strong> <small style="color:#888;">(${d['카테고리2']})</small>`;
+        item.onclick = () => moveToLocation(d.위도, d.경도);
         listDiv.appendChild(item);
+    });
+
+    currentIndex += PAGE_SIZE;
+
+    // 더보기 버튼 제어
+    const moreBtn = document.getElementById('load-more-btn');
+    if (currentIndex < filteredData.length) {
+        moreBtn.style.display = 'block';
+    } else {
+        moreBtn.style.display = 'none';
+    }
+}
+
+function loadMore() {
+    renderNextPage();
+}
+
+// 7. 지도 이동 함수
+function moveToLocation(lat, lng) {
+    const loc = new kakao.maps.LatLng(lat, lng);
+    map.panTo(loc);
+    map.setLevel(4); // 클릭 시 상세히 보이도록 레벨 조정
+
+    // 마커 표시
+    new kakao.maps.Marker({
+        position: loc,
+        map: map
     });
 }
 
+// 계획표 이동 (함수명 맞춰주기)
+function goToPlanner() {
+    alert("나만의 여행 계획표 페이지로 이동합니다.");
+}
