@@ -108,49 +108,6 @@ function renderList(data, isCourse = false) {
             </div>`;
     });
 }
-
-function initMap(lat, lng) {
-    const container = document.getElementById('map');
-    map = new kakao.maps.Map(container, { center: new kakao.maps.LatLng(lat, lng), level: 5 });
-}
-
-function renderMapMarkers(course) {
-    const path = [];
-    course.forEach(d => {
-        const pos = new kakao.maps.LatLng(d.위도, d.경도);
-        path.push(pos);
-        new kakao.maps.Marker({ position: pos, map: map });
-    });
-    polyline = new kakao.maps.Polyline({ path: path, strokeColor: '#e67e22', strokeOpacity: 0.8, strokeWeight: 5, map: map });
-}
-
-function clearMap() { if(polyline) polyline.setMap(null); markers.forEach(m => m.setMap(null)); }
-// 검색 결과를 목록에 표시하는 함수
-function displayPlaces(places) {
-    const listDiv = document.getElementById('info-list');
-    listDiv.innerHTML = ''; // 이전 결과 초기화
-
-    if (places.length === 0) {
-        listDiv.innerHTML = '<p class="no-result">조회된 결과가 없습니다.</p>';
-        return;
-    }
-
-    places.forEach((place) => {
-        // 1. 목록 아이템 생성
-        const item = document.createElement('div');
-        item.className = 'place-item';
-        item.style.cursor = 'pointer'; // 클릭 가능함을 표시
-        item.innerText = place.title; // CSV/API 데이터의 '이름' 필드
-
-        // 2. 클릭 이벤트 추가
-        item.onclick = function() {
-            moveToLocation(place.lat, place.lng); // 위도, 경도 전달
-        };
-
-        listDiv.appendChild(item);
-    });
-}
-
 // 지도를 해당 위치로 이동시키는 함수
 function moveToLocation(lat, lng) {
     // 카카오맵 좌표 객체 생성
@@ -227,5 +184,48 @@ function updateGugun() {
     opt.textContent = gugun;
     gugunSelect.appendChild(opt);
   });
+}
+
+
+function initMap(lat, lng) {
+    const container = document.getElementById('map');
+    map = new kakao.maps.Map(container, { center: new kakao.maps.LatLng(lat, lng), level: 5 });
+}
+
+function renderMapMarkers(course) {
+    const path = [];
+    course.forEach(d => {
+        const pos = new kakao.maps.LatLng(d.위도, d.경도);
+        path.push(pos);
+        new kakao.maps.Marker({ position: pos, map: map });
+    });
+    polyline = new kakao.maps.Polyline({ path: path, strokeColor: '#e67e22', strokeOpacity: 0.8, strokeWeight: 5, map: map });
+}
+
+function clearMap() { if(polyline) polyline.setMap(null); markers.forEach(m => m.setMap(null)); }
+// 검색 결과를 목록에 표시하는 함수
+function displayPlaces(places) {
+    const listDiv = document.getElementById('info-list');
+    listDiv.innerHTML = ''; // 이전 결과 초기화
+
+    if (places.length === 0) {
+        listDiv.innerHTML = '<p class="no-result">조회된 결과가 없습니다.</p>';
+        return;
+    }
+
+    places.forEach((place) => {
+        // 1. 목록 아이템 생성
+        const item = document.createElement('div');
+        item.className = 'place-item';
+        item.style.cursor = 'pointer'; // 클릭 가능함을 표시
+        item.innerText = place.title; // CSV/API 데이터의 '이름' 필드
+
+        // 2. 클릭 이벤트 추가
+        item.onclick = function() {
+            moveToLocation(place.lat, place.lng); // 위도, 경도 전달
+        };
+
+        listDiv.appendChild(item);
+    });
 }
 
