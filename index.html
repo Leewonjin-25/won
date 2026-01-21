@@ -1,161 +1,164 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>배리어프리 문화관광 지도</title>
-    
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_APP_KEY&libraries=services"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    
-    <style>
-        :root {
-            --primary-color: #4A90E2;
-            --secondary-color: #2ECC71;
-            --bg-color: #f4f7f6;
-        }
+  <meta charset="UTF-8" />
+  <title>배리어프리 문화관광 지도</title>
 
-        body {
-            font-family: 'Pretendard', -apple-system, sans-serif;
-            margin: 0; padding: 20px;
-            background-color: var(--bg-color);
-        }
+  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_APP_KEY"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 
-        .container {
-            max-width: 800px; margin: 0 auto;
-            background: white; padding: 20px;
-            border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        h1 { text-align: center; color: #333; margin-bottom: 20px; }
-
-        .filter-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
-        select { flex: 1; min-width: 120px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
-        
-        .search-btn {
-            width: 100%; padding: 12px;
-            background-color: var(--primary-color);
-            color: white; border: none; border-radius: 6px;
-            font-weight: bold; cursor: pointer;
-        }
-
-        #map { width: 100%; height: 400px; border-radius: 8px; margin-top: 20px; border: 1px solid #eee; }
-
-        /* 목록 영역 */
-        #list-container { margin-top: 20px; border: 1px solid #eee; border-radius: 8px; overflow: hidden; }
-        .place-item {
-            padding: 15px 20px; border-bottom: 1px solid #f0f0f0;
-            cursor: pointer; transition: background 0.2s;
-        }
-        .place-item:hover { background-color: #f0f7ff; color: var(--primary-color); }
-
-        /* 더보기 버튼 */
-        #load-more-btn {
-            width: 100%; padding: 10px;
-            background-color: #fff; color: #666;
-            border: none; border-top: 1px solid #eee;
-            cursor: pointer; display: none; /* 결과가 있을 때만 표시 */
-        }
-        #load-more-btn:hover { background-color: #f9f9f9; }
-
-        /* 계획표 만들기 버튼 전용 영역 */
-        .action-group { margin-top: 20px; text-align: center; }
-        .plan-btn {
-            width: 100%; padding: 15px;
-            background-color: var(--secondary-color);
-            color: white; border: none; border-radius: 6px;
-            font-size: 16px; font-weight: bold; cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .plan-btn:hover { background-color: #27ae60; }
-
-        .guide { text-align: center; color: #888; padding: 30px; }
-    </style>
+  <style>
+    body { font-family: sans-serif; background:#f4f7f6; padding:20px; }
+    .container { max-width:800px; margin:auto; background:white; padding:20px; border-radius:10px; }
+    h1 { text-align:center; }
+    .filter-group { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; }
+    select, button { padding:10px; flex:1; }
+    button { background:#4A90E2; color:white; border:none; border-radius:6px; cursor:pointer; }
+    #map { width:100%; height:400px; margin-top:15px; border:1px solid #ddd; }
+    .place-item { padding:10px; border-bottom:1px solid #eee; cursor:pointer; }
+    .place-item:hover { background:#f0f7ff; }
+    #load-more-btn { display:none; background:#eee; color:#333; }
+  </style>
 </head>
 <body>
+<div class="container">
+  <h1>♿ 배리어프리 문화관광 탐방</h1>
 
-    <div class="container">
-        <h1>♿ 배리어프리 문화관광 탐방</h1>
-        
-        <div class="filter-group">
-            <select id="sidoSelect" onchange="updateGugun()"><option value="">시/도 선택</option></select>
-            <select id="gugunSelect"><option value="">시/군/구 선택</option></select>
-            <select id="cat1Select"><option value="">대분류</option></select>
-            <select id="cat2Select"><option value="">중분류</option></select>
-            <button onclick="handleSearch()" class="search-btn">조회하기</button>
-        </div>
+  <div class="filter-group">
+    <select id="sidoSelect" onchange="updateGugun()">
+      <option value="">시/도 선택</option>
+    </select>
+    <select id="gugunSelect">
+      <option value="">시/군/구 선택</option>
+    </select>
+    <select id="cat1Select">
+      <option value="">대분류</option>
+    </select>
+    <select id="cat2Select">
+      <option value="">중분류</option>
+    </select>
+    <button onclick="searchPlaces()">조회하기</button>
+  </div>
 
-        <div id="map"></div>
+  <div id="map"></div>
 
-        <div id="list-container">
-            <div id="info-list">
-                <p class="guide">조회하기 버튼을 눌러 관광지를 확인하세요.</p>
-            </div
-                <button onclick="searchPlaces()" class="search-btn">조회하기</button>
-            <button id="load-more-btn" onclick="loadMore()">더보기 ▾</button>
-        </div>
-
-        <div class="action-group">
-            <button onclick="goToPlanner()" class="plan-btn">🗓️ 나만의 여행 계획표 만들기</button>
-        </div>
+  <div id="list-container">
+    <div id="info-list">
+      <p style="text-align:center;color:#888;">조회하기 버튼을 눌러주세요.</p>
     </div>
+    <button id="load-more-btn" onclick="loadMore()">더보기 ▾</button>
+  </div>
+</div>
 
-    <script>
-        // --- 스크립트 핵심 로직 예시 ---
-        let allData = []; // 검색된 전체 데이터를 저장
-        let currentIndex = 0; // 현재 보여준 데이터 개수
-        const PAGE_SIZE = 10; // 한 번에 보여줄 개수
+<script>
+/* ===== 시/도, 시/군/구 데이터 ===== */
+const sidoList = [
+ "서울특별시","부산광역시","대구광역시","인천광역시","광주광역시",
+ "대전광역시","울산광역시","세종특별자치시",
+ "경기도","강원특별자치도","충청북도","충청남도",
+ "전라북도","전라남도","경상북도","경상남도","제주특별자치도"
+];
 
-        function handleSearch() {
-            // 실제 구현 시에는 CSV나 API에서 데이터를 가져와서 allData에 넣습니다.
-            // 여기서는 예시로 설명합니다.
-            // allData = filteredResults; 
-            currentIndex = 0;
-            document.getElementById('info-list').innerHTML = '';
-            renderNextPage();
-        }
+const gugunData = {
+ "서울특별시":["종로구","중구","용산구","강남구","서초구"],
+ "부산광역시":["해운대구","수영구","사하구","기장군"],
+ "대구광역시":["중구","달서구","수성구"],
+ "인천광역시":["부평구","연수구","서구"],
+ "광주광역시":["동구","서구","광산구"],
+ "대전광역시":["서구","유성구","대덕구"],
+ "울산광역시":["남구","동구","울주군"],
+ "세종특별자치시":["세종시"],
+ "경기도":["수원시","성남시","고양시","용인시","화성시"],
+ "강원특별자치도":["춘천시","강릉시","속초시"],
+ "충청북도":["청주시","충주시"],
+ "충청남도":["천안시","아산시"],
+ "전라북도":["전주시","군산시"],
+ "전라남도":["목포시","순천시"],
+ "경상북도":["포항시","경주시"],
+ "경상남도":["창원시","김해시"],
+ "제주특별자치도":["제주시","서귀포시"]
+};
 
-        function renderNextPage() {
-            const listDiv = document.getElementById('info-list');
-            const nextData = allData.slice(currentIndex, currentIndex + PAGE_SIZE);
-            
-            nextData.forEach(place => {
-                const item = document.createElement('div');
-                item.className = 'place-item';
-                item.innerText = place.title;
-                item.onclick = () => moveToLocation(place.lat, place.lng);
-                listDiv.appendChild(item);
-            });
+/* ===== 전역 변수 ===== */
+let map;
+let allData = [];
+let currentIndex = 0;
+const PAGE_SIZE = 10;
 
-            currentIndex += PAGE_SIZE;
+/* ===== 페이지 로드 후 실행 ===== */
+window.onload = function() {
+  const sidoSelect = document.getElementById("sidoSelect");
+  sidoList.forEach(sido => {
+    const opt = document.createElement("option");
+    opt.value = sido;
+    opt.textContent = sido;
+    sidoSelect.appendChild(opt);
+  });
+  initMap();
+};
 
-            // 더보기 버튼 표시 여부 제어
-            const btn = document.getElementById('load-more-btn');
-            if (currentIndex < allData.length) {
-                btn.style.display = 'block';
-            } else {
-                btn.style.display = 'none';
-            }
-        }
+/* ===== 시/군/구 갱신 ===== */
+function updateGugun() {
+  const sido = document.getElementById("sidoSelect").value;
+  const gugunSelect = document.getElementById("gugunSelect");
+  gugunSelect.innerHTML = '<option value="">시/군/구 선택</option>';
+  if(!gugunData[sido]) return;
 
-        function loadMore() {
-            renderNextPage();
-        }
+  gugunData[sido].forEach(g => {
+    const opt = document.createElement("option");
+    opt.value = g;
+    opt.textContent = g;
+    gugunSelect.appendChild(opt);
+  });
+}
 
-        function goToPlanner() {
-            alert('계획표 만들기 페이지로 이동하거나 팝업을 띄웁니다.');
-            // window.location.href = 'planner.html'; // 실제 이동 시 사용
-        }
+/* ===== 지도 초기화 ===== */
+function initMap() {
+  map = new kakao.maps.Map(document.getElementById("map"), {
+    center: new kakao.maps.LatLng(37.5665,126.9780),
+    level:7
+  });
+}
 
-        // 지도 이동 함수 (기존 로직 유지)
-        function moveToLocation(lat, lng) {
-            if(typeof map !== 'undefined') {
-                map.panTo(new kakao.maps.LatLng(lat, lng));
-            }
-        }
-        const sidoSelect = document.getElementById("sidoSelect");
+/* ===== 조회 ===== */
+function searchPlaces() {
+  // 테스트용 더미 데이터
+  allData = [
+    {title:"예시 관광지1", lat:37.57, lng:126.98},
+    {title:"예시 관광지2", lat:37.56, lng:126.99},
+    {title:"예시 관광지3", lat:37.55, lng:126.97}
+  ];
+  currentIndex = 0;
+  document.getElementById("info-list").innerHTML = "";
+  renderNextPage();
+}
 
-    </script>
-    </body>
-<script src="script.js"></script>
+/* ===== 목록 출력 ===== */
+function renderNextPage() {
+  const listDiv = document.getElementById("info-list");
+  const next = allData.slice(currentIndex, currentIndex + PAGE_SIZE);
+
+  next.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "place-item";
+    div.innerText = p.title;
+    div.onclick = () => moveToLocation(p.lat,p.lng);
+    listDiv.appendChild(div);
+  });
+
+  currentIndex += PAGE_SIZE;
+  document.getElementById("load-more-btn").style.display =
+    currentIndex < allData.length ? "block" : "none";
+}
+
+function loadMore(){ renderNextPage(); }
+
+/* ===== 지도 이동 ===== */
+function moveToLocation(lat,lng){
+  const pos = new kakao.maps.LatLng(lat,lng);
+  map.panTo(pos);
+  new kakao.maps.Marker({map:map, position:pos});
+}
+</script>
+</body>
 </html>
