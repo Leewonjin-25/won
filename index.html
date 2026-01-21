@@ -154,6 +154,15 @@ function renderNext(){
  loadMoreBtn.style.display = currentIndex<filteredData.length ? "block":"none";
 }
 function loadMore(){renderNext();}
+ <div id="info-list">
+    <p class="guide">지역과 카테고리를 선택한 후 조회하기를 눌러주세요.</p>
+</div>
+
+<button id="load-more-btn" onclick="loadMore()" style="display:none;">더보기 ▾</button>
+
+<div class="action-group">
+    <button onclick="goToPlanner()" class="plan-btn">🗓️ 나만의 여행 계획표 만들기</button>
+</div>
 </script>
 </body>
 </html>
