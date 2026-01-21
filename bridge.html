@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>배리어프리 문화관광 지도</title>
     
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=08c982bd1ad1cff1faa4d7f707db1665&libraries=services"></script>
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_APP_KEY&libraries=services"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <style>
@@ -51,4 +51,108 @@
 
         /* 더보기 버튼 */
         #load-more-btn {
-            width: 10
+            width: 100%; padding: 10px;
+            background-color: #fff; color: #666;
+            border: none; border-top: 1px solid #eee;
+            cursor: pointer; display: none; /* 결과가 있을 때만 표시 */
+        }
+        #load-more-btn:hover { background-color: #f9f9f9; }
+
+        /* 계획표 만들기 버튼 전용 영역 */
+        .action-group { margin-top: 20px; text-align: center; }
+        .plan-btn {
+            width: 100%; padding: 15px;
+            background-color: var(--secondary-color);
+            color: white; border: none; border-radius: 6px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .plan-btn:hover { background-color: #27ae60; }
+
+        .guide { text-align: center; color: #888; padding: 30px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>♿ 배리어프리 문화관광 탐방</h1>
+        
+        <div class="filter-group">
+            <select id="sidoSelect" onchange="updateGugun()"><option value="">시/도 선택</option></select>
+            <select id="gugunSelect"><option value="">시/군/구 선택</option></select>
+            <select id="cat1Select"><option value="">대분류</option></select>
+            <select id="cat2Select"><option value="">중분류</option></select>
+            <button onclick="handleSearch()" class="search-btn">조회하기</button>
+        </div>
+
+        <div id="map"></div>
+
+        <div id="list-container">
+            <div id="info-list">
+                <p class="guide">조회하기 버튼을 눌러 관광지를 확인하세요.</p>
+            </div>
+            <button id="load-more-btn" onclick="loadMore()">더보기 ▾</button>
+        </div>
+
+        <div class="action-group">
+            <button onclick="goToPlanner()" class="plan-btn">🗓️ 나만의 여행 계획표 만들기</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 스크립트 핵심 로직 예시 ---
+        let allData = []; // 검색된 전체 데이터를 저장
+        let currentIndex = 0; // 현재 보여준 데이터 개수
+        const PAGE_SIZE = 10; // 한 번에 보여줄 개수
+
+        function handleSearch() {
+            // 실제 구현 시에는 CSV나 API에서 데이터를 가져와서 allData에 넣습니다.
+            // 여기서는 예시로 설명합니다.
+            // allData = filteredResults; 
+            currentIndex = 0;
+            document.getElementById('info-list').innerHTML = '';
+            renderNextPage();
+        }
+
+        function renderNextPage() {
+            const listDiv = document.getElementById('info-list');
+            const nextData = allData.slice(currentIndex, currentIndex + PAGE_SIZE);
+            
+            nextData.forEach(place => {
+                const item = document.createElement('div');
+                item.className = 'place-item';
+                item.innerText = place.title;
+                item.onclick = () => moveToLocation(place.lat, place.lng);
+                listDiv.appendChild(item);
+            });
+
+            currentIndex += PAGE_SIZE;
+
+            // 더보기 버튼 표시 여부 제어
+            const btn = document.getElementById('load-more-btn');
+            if (currentIndex < allData.length) {
+                btn.style.display = 'block';
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        function loadMore() {
+            renderNextPage();
+        }
+
+        function goToPlanner() {
+            alert('계획표 만들기 페이지로 이동하거나 팝업을 띄웁니다.');
+            // window.location.href = 'planner.html'; // 실제 이동 시 사용
+        }
+
+        // 지도 이동 함수 (기존 로직 유지)
+        function moveToLocation(lat, lng) {
+            if(typeof map !== 'undefined') {
+                map.panTo(new kakao.maps.LatLng(lat, lng));
+            }
+        }
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
