@@ -1,164 +1,159 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>배리어프리 문화관광 지도</title>
-
-  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_APP_KEY"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-
-  <style>
-    body { font-family: sans-serif; background:#f4f7f6; padding:20px; }
-    .container { max-width:800px; margin:auto; background:white; padding:20px; border-radius:10px; }
-    h1 { text-align:center; }
-    .filter-group { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; }
-    select, button { padding:10px; flex:1; }
-    button { background:#4A90E2; color:white; border:none; border-radius:6px; cursor:pointer; }
-    #map { width:100%; height:400px; margin-top:15px; border:1px solid #ddd; }
-    .place-item { padding:10px; border-bottom:1px solid #eee; cursor:pointer; }
-    .place-item:hover { background:#f0f7ff; }
-    #load-more-btn { display:none; background:#eee; color:#333; }
-  </style>
+<meta charset="UTF-8">
+<title>배리어프리 문화관광 지도</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_APP_KEY"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+<style>
+body{font-family:sans-serif;background:#f4f7f6;padding:20px}
+.container{max-width:900px;margin:auto;background:#fff;padding:20px;border-radius:10px}
+.filter-group{display:flex;flex-wrap:wrap;gap:8px}
+select,button{padding:10px;border-radius:6px;border:1px solid #ccc;flex:1}
+button{background:#4A90E2;color:#fff;border:none;font-weight:bold;cursor:pointer}
+#map{width:100%;height:350px;margin-top:15px;border-radius:8px}
+.place-item{padding:12px;border-bottom:1px solid #eee;cursor:pointer}
+.place-item:hover{background:#f0f7ff}
+#load-more-btn{width:100%;padding:10px;border:none;display:none}
+.guide{text-align:center;color:#888;padding:20px}
+</style>
 </head>
 <body>
 <div class="container">
-  <h1>♿ 배리어프리 문화관광 탐방</h1>
+<h2>♿ 배리어프리 문화관광 탐방</h2>
 
-  <div class="filter-group">
-    <select id="sidoSelect" onchange="updateGugun()">
-      <option value="">시/도 선택</option>
-    </select>
-    <select id="gugunSelect">
-      <option value="">시/군/구 선택</option>
-    </select>
-    <select id="cat1Select">
-      <option value="">대분류</option>
-    </select>
-    <select id="cat2Select">
-      <option value="">중분류</option>
-    </select>
-    <button onclick="searchPlaces()">조회하기</button>
-  </div>
+<div class="filter-group">
+<select id="sidoSelect" onchange="updateGugun()"><option value="">시/도 선택</option></select>
+<select id="gugunSelect"><option value="">시/군/구 선택</option></select>
+<select id="cat1Select"><option value="">대분류</option></select>
+<select id="cat2Select"><option value="">중분류</option></select>
+<button onclick="searchPlaces()">조회하기</button>
+</div>
 
-  <div id="map"></div>
+<div id="map"></div>
 
-  <div id="list-container">
-    <div id="info-list">
-      <p style="text-align:center;color:#888;">조회하기 버튼을 눌러주세요.</p>
-    </div>
-    <button id="load-more-btn" onclick="loadMore()">더보기 ▾</button>
-  </div>
+<div id="info-list">
+<p class="guide">조건을 선택하고 조회하기를 누르세요.</p>
+</div>
+<button id="load-more-btn" onclick="loadMore()">더보기 ▾</button>
 </div>
 
 <script>
-/* ===== 시/도, 시/군/구 데이터 ===== */
-const sidoList = [
- "서울특별시","부산광역시","대구광역시","인천광역시","광주광역시",
- "대전광역시","울산광역시","세종특별자치시",
- "경기도","강원특별자치도","충청북도","충청남도",
- "전라북도","전라남도","경상북도","경상남도","제주특별자치도"
-];
-
-const gugunData = {
- "서울특별시":["종로구","중구","용산구","강남구","서초구"],
- "부산광역시":["해운대구","수영구","사하구","기장군"],
- "대구광역시":["중구","달서구","수성구"],
- "인천광역시":["부평구","연수구","서구"],
- "광주광역시":["동구","서구","광산구"],
- "대전광역시":["서구","유성구","대덕구"],
- "울산광역시":["남구","동구","울주군"],
- "세종특별자치시":["세종시"],
- "경기도":["수원시","성남시","고양시","용인시","화성시"],
- "강원특별자치도":["춘천시","강릉시","속초시"],
- "충청북도":["청주시","충주시"],
- "충청남도":["천안시","아산시"],
- "전라북도":["전주시","군산시"],
- "전라남도":["목포시","순천시"],
- "경상북도":["포항시","경주시"],
- "경상남도":["창원시","김해시"],
- "제주특별자치도":["제주시","서귀포시"]
-};
-
-/* ===== 전역 변수 ===== */
+let allData=[];
+let filteredData=[];
+let currentIndex=0;
+const PAGE_SIZE=10;
 let map;
-let allData = [];
-let currentIndex = 0;
-const PAGE_SIZE = 10;
 
-/* ===== 페이지 로드 후 실행 ===== */
-window.onload = function() {
-  const sidoSelect = document.getElementById("sidoSelect");
-  sidoList.forEach(sido => {
-    const opt = document.createElement("option");
-    opt.value = sido;
-    opt.textContent = sido;
-    sidoSelect.appendChild(opt);
-  });
-  initMap();
-};
+// -------- CSV 로드 --------
+Papa.parse("한국문화정보원_전국 배리어프리 문화예술관광지_20221125.csv",{
+ download:true,
+ header:true,
+ complete:(res)=>{
+   allData = res.data.filter(d=>d.시설명 && d.위도 && d.경도);
+   initSido();
+   initCategory();
+   initMap(37.5665,126.9780);
+ }
+});
 
-/* ===== 시/군/구 갱신 ===== */
-function updateGugun() {
-  const sido = document.getElementById("sidoSelect").value;
-  const gugunSelect = document.getElementById("gugunSelect");
-  gugunSelect.innerHTML = '<option value="">시/군/구 선택</option>';
-  if(!gugunData[sido]) return;
-
-  gugunData[sido].forEach(g => {
-    const opt = document.createElement("option");
-    opt.value = g;
-    opt.textContent = g;
-    gugunSelect.appendChild(opt);
-  });
+// -------- 시/도 --------
+function initSido(){
+ const sidos=[...new Set(allData.map(d=>d["시도 명칭"]).filter(Boolean))].sort();
+ const el=document.getElementById("sidoSelect");
+ sidos.forEach(s=>{
+   const o=document.createElement("option");
+   o.value=s;o.textContent=s;el.appendChild(o);
+ });
 }
 
-/* ===== 지도 초기화 ===== */
-function initMap() {
-  map = new kakao.maps.Map(document.getElementById("map"), {
-    center: new kakao.maps.LatLng(37.5665,126.9780),
-    level:7
-  });
+// -------- 시/군/구 --------
+function updateGugun(){
+ const sido=document.getElementById("sidoSelect").value;
+ const el=document.getElementById("gugunSelect");
+ el.innerHTML=`<option value="">시/군/구 선택</option>`;
+ if(!sido)return;
+ const list=[...new Set(allData.filter(d=>d["시도 명칭"]===sido).map(d=>d["시군구 명칭"]).filter(Boolean))].sort();
+ list.forEach(g=>{
+   const o=document.createElement("option");
+   o.value=g;o.textContent=g;el.appendChild(o);
+ });
 }
 
-/* ===== 조회 ===== */
-function searchPlaces() {
-  // 테스트용 더미 데이터
-  allData = [
-    {title:"예시 관광지1", lat:37.57, lng:126.98},
-    {title:"예시 관광지2", lat:37.56, lng:126.99},
-    {title:"예시 관광지3", lat:37.55, lng:126.97}
-  ];
-  currentIndex = 0;
-  document.getElementById("info-list").innerHTML = "";
-  renderNextPage();
+// -------- 카테고리 --------
+function initCategory(){
+ const cat1=[...new Set(allData.map(d=>d["카테고리1"]).filter(Boolean))].sort();
+ const cat1El=document.getElementById("cat1Select");
+ const cat2El=document.getElementById("cat2Select");
+
+ cat1.forEach(c=>{
+   const o=document.createElement("option");
+   o.value=c;o.textContent=c;cat1El.appendChild(o);
+ });
+
+ cat1El.onchange=function(){
+   const v=this.value;
+   cat2El.innerHTML=`<option value="">중분류</option>`;
+   const list=[...new Set(allData.filter(d=>d["카테고리1"]===v).map(d=>d["카테고리2"]).filter(Boolean))].sort();
+   list.forEach(c=>{
+     const o=document.createElement("option");
+     o.value=c;o.textContent=c;cat2El.appendChild(o);
+   });
+ };
 }
 
-/* ===== 목록 출력 ===== */
-function renderNextPage() {
-  const listDiv = document.getElementById("info-list");
-  const next = allData.slice(currentIndex, currentIndex + PAGE_SIZE);
-
-  next.forEach(p => {
-    const div = document.createElement("div");
-    div.className = "place-item";
-    div.innerText = p.title;
-    div.onclick = () => moveToLocation(p.lat,p.lng);
-    listDiv.appendChild(div);
-  });
-
-  currentIndex += PAGE_SIZE;
-  document.getElementById("load-more-btn").style.display =
-    currentIndex < allData.length ? "block" : "none";
+// -------- 지도 --------
+function initMap(lat,lng){
+ map=new kakao.maps.Map(document.getElementById("map"),{
+   center:new kakao.maps.LatLng(lat,lng),level:8
+ });
+}
+function moveTo(lat,lng){
+ const pos=new kakao.maps.LatLng(parseFloat(lat),parseFloat(lng));
+ map.panTo(pos);
+ new kakao.maps.Marker({map,position:pos});
 }
 
-function loadMore(){ renderNextPage(); }
+// -------- 검색 --------
+function searchPlaces(){
+ const sido=sidoSelect.value;
+ const gugun=gugunSelect.value;
+ const c1=cat1Select.value;
+ const c2=cat2Select.value;
 
-/* ===== 지도 이동 ===== */
-function moveToLocation(lat,lng){
-  const pos = new kakao.maps.LatLng(lat,lng);
-  map.panTo(pos);
-  new kakao.maps.Marker({map:map, position:pos});
+ filteredData = allData.filter(d=>
+   (!sido||d["시도 명칭"]===sido) &&
+   (!gugun||d["시군구 명칭"]===gugun) &&
+   (!c1||d["카테고리1"]===c1) &&
+   (!c2||d["카테고리2"]===c2)
+ );
+
+ currentIndex=0;
+ infoList.innerHTML="";
+ if(filteredData.length===0){
+   infoList.innerHTML=`<p class="guide">결과가 없습니다.</p>`;
+   loadMoreBtn.style.display="none";
+   return;
+ }
+ renderNext();
+ moveTo(filteredData[0].위도,filteredData[0].경도);
 }
+
+// -------- 목록 --------
+function renderNext(){
+ const part=filteredData.slice(currentIndex,currentIndex+PAGE_SIZE);
+ part.forEach(d=>{
+   const div=document.createElement("div");
+   div.className="place-item";
+   div.innerHTML=`<b>${d.시설명}</b> <small>${d["카테고리2"]||""}</small>`;
+   div.onclick=()=>moveTo(d.위도,d.경도);
+   infoList.appendChild(div);
+ });
+ currentIndex+=PAGE_SIZE;
+ loadMoreBtn.style.display = currentIndex<filteredData.length ? "block":"none";
+}
+function loadMore(){renderNext();}
 </script>
 </body>
 </html>
